@@ -251,24 +251,24 @@ const App: React.FC = () => {
 
   return (
     <div className="h-screen w-screen bg-black text-slate-100 flex flex-col overflow-hidden">
-      <nav className="h-16 bg-black border-b border-white/5 px-4 md:px-8 flex items-center justify-between shrink-0 z-50">
-        <div className="flex items-center gap-3 min-w-0 flex-1 overflow-hidden">
-          <div className="flex items-center gap-1 shrink-0">
-            <button onClick={() => setSelectedStation(null)} className="p-2 text-slate-500 hover:text-white"><Icons.ChevronDoubleLeft /></button>
-            {selectedService && <button onClick={() => setSelectedService(null)} className="p-2 text-slate-400 hover:text-white"><Icons.ChevronLeft /></button>}
-          </div>
-          <div className="flex flex-col min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="text-blue-500 font-black text-[10px] tracking-widest">{selectedStation.crs}</span>
-              <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${isRefreshError ? 'bg-rose-500' : 'bg-emerald-500'}`} />
+      <nav className="h-16 bg-black border-b border-white/5 px-4 md:px-8 flex items-center justify-between shrink-0 z-50 relative">
+        <div className="flex items-center gap-1 shrink-0 z-10">
+          <button onClick={() => setSelectedStation(null)} className="p-2 text-slate-500 hover:text-white"><Icons.ChevronDoubleLeft /></button>
+          {selectedService && <button onClick={() => setSelectedService(null)} className="p-2 text-slate-400 hover:text-white"><Icons.ChevronLeft /></button>}
+        </div>
+
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none px-16">
+          <div className="flex flex-col items-center pointer-events-auto">
+            <div className="bg-blue-600 border-2 border-white rounded-full px-4 py-1.5 md:px-6 md:py-2 shadow-[0_0_25px_rgba(37,99,235,0.5)] flex items-center gap-2 max-w-[200px] sm:max-w-[300px] md:max-w-md">
+              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isRefreshError ? 'animate-pulse-red' : 'animate-pulse-green'}`} />
+              <h1 className="text-[10px] md:text-sm font-black uppercase tracking-widest text-white truncate leading-none">
+                {selectedService ? getFullDestinationName(selectedService) : selectedStation.name}
+              </h1>
             </div>
-            <h1 className="text-sm md:text-lg font-black uppercase italic tracking-tighter leading-none truncate">
-              {selectedService ? getFullDestinationName(selectedService) : selectedStation.name}
-            </h1>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 md:gap-4 shrink-0">
+        <div className="flex items-center gap-2 md:gap-4 shrink-0 z-10">
           <div className="flex flex-col items-end">
             <span className={`text-[6px] md:text-[8px] font-black uppercase tracking-[0.4em] mb-0.5 ${isRefreshError ? 'text-rose-500/60' : 'text-emerald-500/60'}`}>
               {isRefreshError ? 'SYNC_LOSS' : 'LAST_UPDATE'}
@@ -365,16 +365,24 @@ const App: React.FC = () => {
                           </span>
                           <div className={`w-3 h-3 rounded-full border-2 mt-2 transition-all ${isGone ? 'bg-zinc-900 border-zinc-700' : status.isArrivedOnly ? 'bg-pink-500 border-pink-500 scale-110 animate-pulse' : 'bg-black border-blue-600'}`} />
                         </div>
-                        <div className="flex-1 min-w-0">
+                        <button 
+                          onClick={() => {
+                            if (loc.crs) {
+                              loadStationData({ name: loc.description, crs: loc.crs });
+                              setSelectedService(null);
+                            }
+                          }}
+                          className="flex-1 min-w-0 text-left group/loc"
+                        >
                           <div className="flex items-center gap-2">
-                            <span className={`text-base font-black uppercase tracking-tight truncate ${isGone ? 'text-zinc-700' : 'text-white'}`}>{loc.description}</span>
-                            <span className="text-[8px] font-black text-zinc-700 uppercase tracking-widest">{loc.crs}</span>
+                            <span className={`text-base font-black uppercase tracking-tight truncate group-hover/loc:text-blue-400 transition-colors ${isGone ? 'text-zinc-700' : 'text-white'}`}>{loc.description}</span>
+                            <span className="text-[8px] font-black text-zinc-700 uppercase tracking-widest group-hover/loc:text-blue-900">{loc.crs}</span>
                           </div>
                           <div className="flex gap-2 mt-1">
                             <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${status.bg} ${status.color}`}>{status.text.toUpperCase()}</span>
                             {loc.platform && <span className="text-[8px] font-black bg-zinc-900 text-zinc-500 px-1.5 py-0.5 rounded">PLAT {loc.platform}</span>}
                           </div>
-                        </div>
+                        </button>
                       </div>
                     );
                   })}
@@ -398,6 +406,16 @@ const App: React.FC = () => {
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #1a1a1a; border-radius: 10px; }
         .animate-in { animation: fadeIn 0.2s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes pulse-green-blue {
+          0%, 100% { background-color: #34d399; }
+          50% { background-color: #2563eb; }
+        }
+        @keyframes pulse-red-blue {
+          0%, 100% { background-color: #f43f5e; }
+          50% { background-color: #2563eb; }
+        }
+        .animate-pulse-green { animation: pulse-green-blue 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        .animate-pulse-red { animation: pulse-red-blue 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
         * { -webkit-tap-highlight-color: transparent; outline: none; }
       `}</style>
     </div>

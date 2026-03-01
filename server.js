@@ -1,5 +1,6 @@
 import express from "express";
 import path from "path";
+import fs from "fs";
 import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -71,11 +72,11 @@ app.get("/api/rtt/service/:serviceUid/:date", async (req, res) => {
 
 // Vite middleware for development
 async function setupVite() {
-  const isProd = process.env.NODE_ENV === "production";
-  console.log(`Starting server in ${isProd ? 'production' : 'development'} mode...`);
+  const isDev = process.env.NODE_ENV === "development";
+  console.log(`Starting server in ${isDev ? 'development' : 'production'} mode...`);
   console.log(`Target Port: ${PORT}`);
 
-  if (!isProd) {
+  if (isDev) {
     try {
       const { createServer } = await import("vite");
       const vite = await createServer({
@@ -91,18 +92,30 @@ async function setupVite() {
   } else {
     serveStatic();
   }
-
-  app.listen(Number(PORT), "0.0.0.0", () => {
-    console.log(`Server running on port ${PORT} (NODE_ENV: ${process.env.NODE_ENV})`);
-  });
 }
 
 function serveStatic() {
   const distPath = path.join(__dirname, "dist");
-  app.use(express.static(distPath));
+  app.use(express.static(distPath, { index: false })); // Disable default index serving
+  
   app.get("*", (req, res) => {
-    res.sendFile(path.join(distPath, "index.html"));
+    const indexPath = path.join(distPath, "index.html");
+    if (fs.existsSync(indexPath)) {
+      let html = fs.readFileSync(indexPath, "utf8");
+      // Inject the API key into the HTML so the frontend can find it
+      const apiKey = process.env.GEMINI_API_KEY || "";
+      const injection = `<script>window.GEMINI_API_KEY = "${apiKey}";</script>`;
+      html = html.replace("<head>", `<head>${injection}`);
+      res.send(html);
+    } else {
+      res.status(404).send("Not Found");
+    }
   });
 }
+
+// Start listening immediately
+app.listen(Number(PORT), "0.0.0.0", () => {
+  console.log(`Server running on port ${PORT} (NODE_ENV: ${process.env.NODE_ENV || 'not set'})`);
+});
 
 setupVite();

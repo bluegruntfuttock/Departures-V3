@@ -1,9 +1,10 @@
 
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
 import { Station } from "../types";
 
 export async function findStationCrs(query: string): Promise<Station[]> {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const apiKey = (window as any).GEMINI_API_KEY || process.env.GEMINI_API_KEY || process.env.API_KEY;
+  const ai = new GoogleGenAI({ apiKey: apiKey as string });
   
   try {
     const response = await ai.models.generateContent({
@@ -25,7 +26,7 @@ export async function findStationCrs(query: string): Promise<Station[]> {
       6. Limit to the 5 most relevant results.`,
       config: {
         responseMimeType: "application/json",
-        thinkingConfig: { thinkingBudget: 0 },
+        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
         responseSchema: {
           type: Type.ARRAY,
           items: {
@@ -52,9 +53,13 @@ export async function findStationCrs(query: string): Promise<Station[]> {
       console.error("JSON parse error in station search:", text);
       return [];
     }
-  } catch (err) {
+  } catch (err: any) {
     console.error("Station search error:", err);
-    throw new Error("Station lookup currently unavailable.");
+    const msg = err?.message || "";
+    if (msg.includes("API_KEY_INVALID") || msg.includes("API key not found")) {
+      throw new Error("Station lookup configuration error (API Key).");
+    }
+    throw new Error(`Station lookup unavailable: ${msg.slice(0, 50)}`);
   }
 }
 
@@ -66,7 +71,8 @@ export interface RouteStops {
 export async function getRouteCallingPoints(routes: {origin: string, via: string, destination: string}[]): Promise<RouteStops[]> {
   if (routes.length === 0) return [];
   
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const apiKey = (window as any).GEMINI_API_KEY || process.env.GEMINI_API_KEY || process.env.API_KEY;
+  const ai = new GoogleGenAI({ apiKey: apiKey as string });
   const viaStation = routes[0].via;
   const routeList = routes.map(r => `- To ${r.destination}`).join('\n');
   
@@ -84,7 +90,7 @@ Instructions:
       contents: prompt,
       config: {
         responseMimeType: "application/json",
-        thinkingConfig: { thinkingBudget: 0 },
+        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
         responseSchema: {
           type: Type.ARRAY,
           items: {
