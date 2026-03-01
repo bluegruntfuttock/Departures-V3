@@ -1,0 +1,5 @@
+{
+  "name": "UK Rail Departures Pro",
+  "description": "A high-performance train departure board using Realtime Trains API, featuring adjacent station navigation and real-time status updates.",
+  "requestFramePermissions": []
+}
