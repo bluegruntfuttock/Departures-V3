@@ -4,6 +4,13 @@ import { Station } from "../types";
 
 export async function findStationCrs(query: string): Promise<Station[]> {
   const apiKey = (window as any).GEMINI_API_KEY || process.env.GEMINI_API_KEY || process.env.API_KEY;
+  
+  if (!apiKey || apiKey === "undefined" || apiKey === "null") {
+    console.error("CRITICAL: GEMINI_API_KEY is missing or invalid in the browser environment!");
+    throw new Error("Station lookup configuration error (API Key Missing).");
+  }
+
+  console.log("Initiating station search for:", query);
   const ai = new GoogleGenAI({ apiKey: apiKey as string });
   
   try {
@@ -26,7 +33,7 @@ export async function findStationCrs(query: string): Promise<Station[]> {
       6. Limit to the 5 most relevant results.`,
       config: {
         responseMimeType: "application/json",
-        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+        // Temporarily removing thinkingConfig to rule out compatibility issues
         responseSchema: {
           type: Type.ARRAY,
           items: {
@@ -42,6 +49,7 @@ export async function findStationCrs(query: string): Promise<Station[]> {
     });
 
     const text = response.text;
+    console.log("Station search raw response received");
     if (!text) return [];
     try {
       const results = JSON.parse(text);
@@ -54,7 +62,7 @@ export async function findStationCrs(query: string): Promise<Station[]> {
       return [];
     }
   } catch (err: any) {
-    console.error("Station search error:", err);
+    console.error("Station search error details:", err);
     const msg = err?.message || "";
     if (msg.includes("API_KEY_INVALID") || msg.includes("API key not found")) {
       throw new Error("Station lookup configuration error (API Key).");
@@ -72,6 +80,12 @@ export async function getRouteCallingPoints(routes: {origin: string, via: string
   if (routes.length === 0) return [];
   
   const apiKey = (window as any).GEMINI_API_KEY || process.env.GEMINI_API_KEY || process.env.API_KEY;
+  if (!apiKey || apiKey === "undefined" || apiKey === "null") {
+    console.error("CRITICAL: GEMINI_API_KEY is missing or invalid for route enrichment!");
+    return [];
+  }
+
+  console.log(`Enriching ${routes.length} routes via Gemini...`);
   const ai = new GoogleGenAI({ apiKey: apiKey as string });
   const viaStation = routes[0].via;
   const routeList = routes.map(r => `- To ${r.destination}`).join('\n');
@@ -90,7 +104,7 @@ Instructions:
       contents: prompt,
       config: {
         responseMimeType: "application/json",
-        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+        // Temporarily removing thinkingConfig
         responseSchema: {
           type: Type.ARRAY,
           items: {
@@ -109,14 +123,16 @@ Instructions:
     });
 
     const text = response.text;
+    console.log("Route enrichment raw response received");
     if (!text) return [];
     try {
       return JSON.parse(text);
     } catch (e) {
+      console.error("JSON parse error in route enrichment:", text);
       return [];
     }
   } catch (err) {
-    console.error("Calling points enrichment error:", err);
+    console.error("Calling points enrichment error details:", err);
     return [];
   }
 }

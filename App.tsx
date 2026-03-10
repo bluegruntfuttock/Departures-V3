@@ -4,6 +4,7 @@ import { Station, Service, ServiceDetail, LocationDetail } from './types';
 import { fetchDepartures, fetchServiceDetails } from './services/rttService';
 import { findStationCrs, getRouteCallingPoints, RouteStops } from './services/geminiService';
 import { MAJOR_STATIONS, Icons } from './constants';
+import { APP_VERSION } from './version';
 
 const RECENT_STATIONS_KEY = 'uk_rail_recent_stations_v4_stable';
 
@@ -27,21 +28,40 @@ const calculateStatus = (location: LocationDetail) => {
   let diffText = "On Time";
   let statusColor = "text-emerald-400";
   let statusBg = "bg-emerald-400/10";
+  let diff = 0;
 
   if (actual && actual !== planned) {
     const pMin = parseInt(planned.slice(0, 2), 10) * 60 + parseInt(planned.slice(2, 4), 10);
     const aMin = parseInt(actual.slice(0, 2), 10) * 60 + parseInt(actual.slice(2, 4), 10);
     const estTime = formatTime(actual);
-    let diff = aMin - pMin;
+    diff = aMin - pMin;
     if (diff < -1200) diff += 1440;
     if (diff > 1200) diff -= 1440;
 
-    if (diff > 0) { diffText = `${diff}m Late (${estTime})`; statusColor = "text-rose-400"; statusBg = "bg-rose-400/10"; }
-    else if (diff < 0) { diffText = `Early (${estTime})`; statusColor = "text-emerald-400"; statusBg = "bg-emerald-400/10"; }
+    if (diff > 0) { 
+      diffText = `${diff}m Late (${estTime})`; 
+      statusColor = "text-rose-400"; 
+      statusBg = "bg-rose-400/10"; 
+    } else if (diff < 0) { 
+      diffText = `${Math.abs(diff)}m Early (${estTime})`; 
+      statusColor = "text-emerald-400"; 
+      statusBg = "bg-emerald-400/10"; 
+    }
   }
   
+  let finalStatusText = diffText;
+  if (isDeparted) {
+    if (diff > 0) finalStatusText = `Departed ${diff}m Late`;
+    else if (diff < 0) finalStatusText = `Departed ${Math.abs(diff)}m Early`;
+    else finalStatusText = "Departed On Time";
+  } else if (isArrivedOnly) {
+    if (diff > 0) finalStatusText = `Arrived ${diff}m Late`;
+    else if (diff < 0) finalStatusText = `Arrived ${Math.abs(diff)}m Early`;
+    else finalStatusText = "Arrived On Time";
+  }
+
   return { 
-    text: isDeparted ? "Departed" : isArrivedOnly ? "At Station" : diffText, 
+    text: finalStatusText, 
     displayStatus: diffText, 
     color: statusColor, 
     bg: statusBg, 
@@ -74,8 +94,21 @@ const App: React.FC = () => {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [recentStations, setRecentStations] = useState<Station[]>([]);
+  const [isStale, setIsStale] = useState(false);
   
   const latestQueryRef = useRef('');
+
+  useEffect(() => {
+    const checkStale = () => {
+      if (!lastUpdated) return;
+      const diff = new Date().getTime() - lastUpdated.getTime();
+      setIsStale(diff > 60000); // 1 minute
+    };
+    
+    const interval = setInterval(checkStale, 5000); // Check every 5 seconds
+    checkStale();
+    return () => clearInterval(interval);
+  }, [lastUpdated]);
 
   useEffect(() => {
     try {
@@ -127,6 +160,7 @@ const App: React.FC = () => {
     if (!silent) { setLoading(true); setError(null); }
     
     setSelectedStation(station);
+    setSelectedService(null);
     setSearchQuery('');
 
     try {
@@ -196,21 +230,31 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      if (selectedService) handleServiceClick(selectedService, true);
-      else if (selectedStation) loadStationData(selectedStation, true);
-    }, 60000);
-    return () => clearInterval(interval);
+    let timeoutId: NodeJS.Timeout;
+
+    const scheduleRefresh = () => {
+      const now = new Date();
+      const seconds = now.getSeconds();
+      const ms = now.getMilliseconds();
+      
+      // Calculate milliseconds until the next :00 or :30 mark
+      const delay = (30 - (seconds % 30)) * 1000 - ms;
+
+      timeoutId = setTimeout(() => {
+        if (selectedService) handleServiceClick(selectedService, true);
+        else if (selectedStation) loadStationData(selectedStation, true);
+        scheduleRefresh();
+      }, delay + 100); // Small buffer to ensure we cross the threshold
+    };
+
+    scheduleRefresh();
+    return () => clearTimeout(timeoutId);
   }, [selectedStation, selectedService, handleServiceClick, loadStationData]);
 
   if (!selectedStation) {
     const stations = recentStations.length > 0 ? recentStations : MAJOR_STATIONS;
     return (
       <div className="h-screen w-screen bg-slate-950 text-slate-200 flex flex-col items-center pt-16 md:pt-24 p-6 overflow-y-auto custom-scrollbar relative">
-        <div className="absolute top-6 right-6">
-          <button onClick={toggleFullscreen} className="p-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-400"><Icons.Fullscreen /></button>
-        </div>
-        
         <div className="w-full max-w-xl animate-in">
           <header className="mb-10 text-center">
             <h1 className="text-4xl md:text-5xl font-black text-white italic uppercase tracking-tighter mb-2">UK Rail Live</h1>
@@ -244,6 +288,17 @@ const App: React.FC = () => {
               </button>
             ))}
           </div>
+          <div className="mt-8 text-center text-[10px] font-black text-slate-800 uppercase tracking-[0.3em]">v{APP_VERSION}</div>
+        </div>
+
+        <div className="fixed bottom-6 right-6 z-[100]">
+          <button 
+            onClick={toggleFullscreen} 
+            className="p-3 bg-slate-900/80 backdrop-blur border border-slate-800 rounded-2xl text-slate-400 hover:text-white hover:border-blue-500 transition-all shadow-2xl active:scale-95"
+            title="Toggle Fullscreen"
+          >
+            {isFullscreen ? <Icons.FullscreenExit /> : <Icons.Fullscreen />}
+          </button>
         </div>
       </div>
     );
@@ -253,14 +308,14 @@ const App: React.FC = () => {
     <div className="h-screen w-screen bg-black text-slate-100 flex flex-col overflow-hidden">
       <nav className="h-16 bg-black border-b border-white/5 px-4 md:px-8 flex items-center justify-between shrink-0 z-50 relative">
         <div className="flex items-center gap-1 shrink-0 z-10">
-          <button onClick={() => setSelectedStation(null)} className="p-2 text-slate-500 hover:text-white"><Icons.ChevronDoubleLeft /></button>
+          <button onClick={() => { setSelectedStation(null); setSelectedService(null); }} className="p-2 text-slate-500 hover:text-white"><Icons.ChevronDoubleLeft /></button>
           {selectedService && <button onClick={() => setSelectedService(null)} className="p-2 text-slate-400 hover:text-white"><Icons.ChevronLeft /></button>}
         </div>
 
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none px-16">
           <div className="flex flex-col items-center pointer-events-auto">
             <div className="bg-blue-600 border-2 border-white rounded-full px-4 py-1.5 md:px-6 md:py-2 shadow-[0_0_25px_rgba(37,99,235,0.5)] flex items-center gap-2 max-w-[200px] sm:max-w-[300px] md:max-w-md">
-              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isRefreshError ? 'animate-pulse-red' : 'animate-pulse-green'}`} />
+              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${(isRefreshError || isStale) ? 'animate-pulse-red' : 'animate-pulse-green'}`} />
               <h1 className="text-[10px] md:text-sm font-black uppercase tracking-widest text-white truncate leading-none">
                 {selectedService ? getFullDestinationName(selectedService) : selectedStation.name}
               </h1>
@@ -270,10 +325,10 @@ const App: React.FC = () => {
 
         <div className="flex items-center gap-2 md:gap-4 shrink-0 z-10">
           <div className="flex flex-col items-end">
-            <span className={`text-[6px] md:text-[8px] font-black uppercase tracking-[0.4em] mb-0.5 ${isRefreshError ? 'text-rose-500/60' : 'text-emerald-500/60'}`}>
-              {isRefreshError ? 'SYNC_LOSS' : 'LAST_UPDATE'}
+            <span className={`text-[6px] md:text-[8px] font-black uppercase tracking-[0.4em] mb-0.5 ${(isRefreshError || isStale) ? 'text-rose-500/60' : 'text-emerald-500/60'}`}>
+              {(isRefreshError || isStale) ? 'STALE_DATA' : 'LAST_UPDATE'}
             </span>
-            <span className={`mono text-xs md:text-base font-bold tracking-wider ${isRefreshError ? 'text-rose-500' : 'text-emerald-400'}`}>
+            <span className={`mono text-xs md:text-base font-bold tracking-wider ${(isRefreshError || isStale) ? 'text-rose-500' : 'text-emerald-400'}`}>
               {lastUpdated ? lastUpdated.toLocaleTimeString('en-GB') : "--:--"}
             </span>
           </div>
@@ -287,7 +342,7 @@ const App: React.FC = () => {
             <div className="flex-1 flex flex-col overflow-hidden h-full">
               <div className="px-3 py-1.5 bg-zinc-900 border-b border-white/5 flex items-center justify-between shrink-0">
                 <span className="text-[10px] font-bold text-blue-500 uppercase">Board Output</span>
-                <div className="text-[7px] font-bold text-zinc-600 uppercase tracking-widest">v3.1.6 STABLE</div>
+                <div className="text-[7px] font-bold text-zinc-600 uppercase tracking-widest">v{APP_VERSION} STABLE</div>
               </div>
               <div className="flex-1 overflow-y-auto custom-scrollbar divide-y divide-white/5">
                 {loading && departures.length === 0 && !error ? (
@@ -332,7 +387,7 @@ const App: React.FC = () => {
                           <div className="flex items-center gap-1.5 mt-1 overflow-hidden whitespace-nowrap">
                             {s.callingPoints ? s.callingPoints.slice(0, 5).map((p, pIdx) => (
                               <React.Fragment key={pIdx}>
-                                <span className="text-[9px] md:text-[11px] font-medium text-slate-500 truncate">{p}</span>
+                                <span className="text-[9px] md:text-[11px] font-medium text-white/70 truncate">{p}</span>
                                 {pIdx < 4 && <span className="text-zinc-800 text-[8px]">•</span>}
                               </React.Fragment>
                             )) : <span className="text-[7px] font-black text-zinc-800 uppercase tracking-widest">{enriching ? 'SCANNING ROUTE...' : 'DIRECT SERVICE'}</span>}
@@ -375,7 +430,7 @@ const App: React.FC = () => {
                           className="flex-1 min-w-0 text-left group/loc"
                         >
                           <div className="flex items-center gap-2">
-                            <span className={`text-base font-black uppercase tracking-tight truncate group-hover/loc:text-blue-400 transition-colors ${isGone ? 'text-zinc-700' : 'text-white'}`}>{loc.description}</span>
+                            <span className={`text-base font-black uppercase tracking-tight truncate group-hover/loc:text-blue-400 transition-colors ${isGone ? 'text-zinc-700' : status.isArrivedOnly ? 'text-pink-500' : 'text-white'}`}>{loc.description}</span>
                             <span className="text-[8px] font-black text-zinc-700 uppercase tracking-widest group-hover/loc:text-blue-900">{loc.crs}</span>
                           </div>
                           <div className="flex gap-2 mt-1">
@@ -398,8 +453,18 @@ const App: React.FC = () => {
           <div className={`w-1 h-1 rounded-full ${isRefreshError ? 'bg-rose-500' : 'bg-emerald-500'}`} />
           {isRefreshError ? 'LINK_BROKEN' : 'LIVE_SYNC_READY'}
         </span>
-        <span className="text-[7px] font-black uppercase tracking-widest text-zinc-800">BUILD_V_3.1.6_PRO</span>
+        <span className="text-[7px] font-black uppercase tracking-widest text-zinc-800">v{APP_VERSION}</span>
       </footer>
+
+      <div className="fixed bottom-6 right-6 z-[100]">
+        <button 
+          onClick={toggleFullscreen} 
+          className="p-3 bg-slate-900/80 backdrop-blur border border-slate-800 rounded-2xl text-slate-400 hover:text-white hover:border-blue-500 transition-all shadow-2xl active:scale-95"
+          title="Toggle Fullscreen"
+        >
+          {isFullscreen ? <Icons.FullscreenExit /> : <Icons.Fullscreen />}
+        </button>
+      </div>
 
       <style>{`
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
