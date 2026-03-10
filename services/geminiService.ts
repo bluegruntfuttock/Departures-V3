@@ -5,6 +5,7 @@ import { Station } from "../types";
 export async function findStationCrs(query: string): Promise<Station[]> {
   const apiKey = (window as any).GEMINI_API_KEY || process.env.GEMINI_API_KEY || process.env.API_KEY;
   
+  console.log("Gemini API Key present:", !!apiKey);
   if (!apiKey || apiKey === "undefined" || apiKey === "null") {
     console.error("CRITICAL: GEMINI_API_KEY is missing or invalid in the browser environment!");
     throw new Error("Station lookup configuration error (API Key Missing).");

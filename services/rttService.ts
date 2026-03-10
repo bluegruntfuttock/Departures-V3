@@ -1,13 +1,4 @@
-
 import { RTTResponse, Service, ServiceDetail } from "../types";
-
-// RTT API Credentials
-const USERNAME = 'rttapi_bluegruntfuttock@gmail.com';
-const PASSWORD = '7c5b8634ff592fe4969a2ae5f4f00303b1c7cc04';
-
-const getAuthHeader = () => {
-  return 'Basic ' + btoa(`${USERNAME}:${PASSWORD}`);
-};
 
 function getSortTime(timeStr: string, refMinutes: number): number {
   const hours = parseInt(timeStr.slice(0, 2), 10);
@@ -32,10 +23,12 @@ async function fetchFromBackend(endpoint: string): Promise<Response> {
 export async function fetchDepartures(crs: string): Promise<RTTResponse> {
   const cleanCrs = crs.trim().toUpperCase();
   const endpoint = `/api/rtt/departures/${cleanCrs}`;
+  console.log(`Calling backend endpoint: ${endpoint}`);
   
   try {
     const response = await fetchFromBackend(endpoint);
     const data: RTTResponse = await response.json();
+    console.log(`Received data from backend for ${cleanCrs}:`, { services: data.services?.length });
     
     if (data.error) throw new Error(`RTT: ${data.error}`);
 

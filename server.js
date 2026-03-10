@@ -62,6 +62,7 @@ app.get("/api/rtt/departures/:crs", async (req, res) => {
   const { crs } = req.params;
   const targetUrl = `https://api.rtt.io/api/v1/json/search/${crs}`;
   
+  console.log(`[RTT] Fetching departures for ${crs}...`);
   try {
     const response = await fetch(targetUrl, {
       headers: {
@@ -69,15 +70,24 @@ app.get("/api/rtt/departures/:crs", async (req, res) => {
       }
     });
 
+    console.log(`[RTT] Response status: ${response.status} ${response.statusText}`);
+
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[RTT] Error response body: ${errorText}`);
       return res.status(response.status).json({ error: `RTT API error: ${response.statusText}` });
     }
 
     const data = await response.json();
+    console.log(`[RTT] Successfully fetched ${data.services?.length || 0} services`);
     res.json(data);
   } catch (error) {
-    console.error("RTT Departures Error:", error);
-    res.status(500).json({ error: "Failed to fetch departures from RTT" });
+    console.error("[RTT] Departures Error Details:", {
+      message: error.message,
+      stack: error.stack,
+      crs
+    });
+    res.status(500).json({ error: `Backend Error: ${error.message}` });
   }
 });
 
@@ -86,6 +96,7 @@ app.get("/api/rtt/service/:serviceUid/:date", async (req, res) => {
   const formattedDate = date.replace(/-/g, '/');
   const targetUrl = `https://api.rtt.io/api/v1/json/service/${serviceUid}/${formattedDate}`;
 
+  console.log(`[RTT] Fetching service details for ${serviceUid} on ${formattedDate}...`);
   try {
     const response = await fetch(targetUrl, {
       headers: {
@@ -93,15 +104,25 @@ app.get("/api/rtt/service/:serviceUid/:date", async (req, res) => {
       }
     });
 
+    console.log(`[RTT] Response status: ${response.status} ${response.statusText}`);
+
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[RTT] Error response body: ${errorText}`);
       return res.status(response.status).json({ error: `RTT API error: ${response.statusText}` });
     }
 
     const data = await response.json();
+    console.log(`[RTT] Successfully fetched service details`);
     res.json(data);
   } catch (error) {
-    console.error("RTT Service Details Error:", error);
-    res.status(500).json({ error: "Failed to fetch service details from RTT" });
+    console.error("[RTT] Service Details Error Details:", {
+      message: error.message,
+      stack: error.stack,
+      serviceUid,
+      formattedDate
+    });
+    res.status(500).json({ error: `Backend Error: ${error.message}` });
   }
 });
 
@@ -146,6 +167,8 @@ function serveStatic() {
 // Initialize server
 async function init() {
   console.log(`Initializing routes (NODE_ENV: ${process.env.NODE_ENV || 'not set'})`);
+  const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+  console.log("GEMINI_API_KEY present in server environment:", !!apiKey);
 
   if (isDev) {
     try {

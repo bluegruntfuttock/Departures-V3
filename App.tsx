@@ -157,6 +157,7 @@ const App: React.FC = () => {
 
   const loadStationData = useCallback(async (station: Station, silent: boolean = false) => {
     if (!station?.crs) return;
+    console.log(`Loading station data for: ${station.name} (${station.crs})`, { silent });
     if (!silent) { setLoading(true); setError(null); }
     
     setSelectedStation(station);
@@ -387,7 +388,7 @@ const App: React.FC = () => {
                           <div className="flex items-center gap-1.5 mt-1 overflow-hidden whitespace-nowrap">
                             {s.callingPoints ? s.callingPoints.slice(0, 5).map((p, pIdx) => (
                               <React.Fragment key={pIdx}>
-                                <span className="text-[9px] md:text-[11px] font-medium text-white/70 truncate">{p}</span>
+                                <span className="text-[9px] md:text-[11px] font-medium text-slate-400 truncate">{p}</span>
                                 {pIdx < 4 && <span className="text-zinc-800 text-[8px]">•</span>}
                               </React.Fragment>
                             )) : <span className="text-[7px] font-black text-zinc-800 uppercase tracking-widest">{enriching ? 'SCANNING ROUTE...' : 'DIRECT SERVICE'}</span>}
@@ -415,10 +416,10 @@ const App: React.FC = () => {
                     return (
                       <div key={lIdx} className="flex gap-4 items-start relative z-10">
                         <div className="flex flex-col items-center w-14 shrink-0">
-                          <span className={`mono text-[10px] font-bold ${isGone ? 'text-zinc-700' : 'text-slate-400'}`}>
+                          <span className={`mono text-[10px] font-bold ${isGone ? 'text-zinc-500' : 'text-slate-400'}`}>
                             {formatTime(loc.gbttBookedArrival || loc.gbttBookedDeparture)}
                           </span>
-                          <div className={`w-3 h-3 rounded-full border-2 mt-2 transition-all ${isGone ? 'bg-zinc-900 border-zinc-700' : status.isArrivedOnly ? 'bg-pink-500 border-pink-500 scale-110 animate-pulse' : 'bg-black border-blue-600'}`} />
+                          <div className={`w-3 h-3 rounded-full border-2 mt-2 transition-all ${isGone ? 'bg-zinc-800 border-zinc-600' : status.isArrivedOnly ? 'bg-pink-500 border-pink-500 scale-110 animate-pulse' : 'bg-black border-blue-600'}`} />
                         </div>
                         <button 
                           onClick={() => {
@@ -430,7 +431,7 @@ const App: React.FC = () => {
                           className="flex-1 min-w-0 text-left group/loc"
                         >
                           <div className="flex items-center gap-2">
-                            <span className={`text-base font-black uppercase tracking-tight truncate group-hover/loc:text-blue-400 transition-colors ${isGone ? 'text-zinc-700' : status.isArrivedOnly ? 'text-pink-500' : 'text-white'}`}>{loc.description}</span>
+                            <span className={`text-base font-black uppercase tracking-tight truncate group-hover/loc:text-blue-400 transition-colors ${isGone ? 'text-zinc-500' : status.isArrivedOnly ? 'text-pink-500' : 'text-white'}`}>{loc.description}</span>
                             <span className="text-[8px] font-black text-zinc-700 uppercase tracking-widest group-hover/loc:text-blue-900">{loc.crs}</span>
                           </div>
                           <div className="flex gap-2 mt-1">
